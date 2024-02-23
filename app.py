@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template
 import requests
+import json
 
 app = Flask(__name__)
 
@@ -10,12 +11,12 @@ def aqi(city,city_dict):
     json_data = response.json()
     geo = json_data['data']['city']['geo']
     lat = geo[0]
-    long = geo[1]
+    longt = geo[1]
     aqi = json_data['data']['aqi']
 
     city_dict['name'] = city
     city_dict['lat'] = lat
-    city_dict['long'] = long
+    city_dict['long'] = longt
     city_dict['aqi'] = aqi
     return aqi
 
@@ -37,8 +38,8 @@ def aqirankfinder(aqi):
     return aqirank
 
 def uv(city,city_dict):
-    api_key = "openuv-13xm4grlsx39x07-io"
-    header = {'x-access-token': "openuv-13xm4grlsx39x07-io"}
+    api_key = "openuv-13xm4grlsxqkuf7-io"
+    header = {'x-access-token': "openuv-13xm4grlsxqkuf7-io"}
     url = f"https://api.openuv.io/api/v1/uv?lat={city_dict['lat']}&lng={city_dict['long']}&alt=100&dt=2024-02-20T13:30:00.000Z"
     response = requests.get(url,headers=header)
     json_data = response.json()
@@ -59,11 +60,31 @@ def uvrankfinder(uv):
     return uvrank
 
 
+
+def walkscore(city,city_dict):
+    walk_api = "ffd1c56f9abcf84872116b4cc2dfcf31"
+    walkUrl = f"https://api.walkscore.com/score?format=json&address={city_dict['name']}&lat={city_dict['lat']}&lon={city_dict['long']}&transit=1&bike=1&wsapikey={walk_api}"
+    response = requests.get(walkUrl).json()
+    walkscoreOutput = response["walkscore"]
+    return walkscoreOutput
+
+    
+
+
 @app.route('/')
 def index():
     return render_template('up.html')
-@app.route('/index.html')
+
+@app.route('/selection.html')
 def second():
+    return render_template('selection.html')
+
+@app.route('/indexsingle.html')
+def third():
+    return render_template('indexsingle.html')
+
+@app.route('/index.html')
+def fourth():
     return render_template('index.html')
 
 @app.route('/compare_cities', methods=['POST'])
@@ -83,21 +104,26 @@ def compare_cities():
     aqirank_b=aqirankfinder(aqi_b)
     uvrank_a=uvrankfinder(uv_a)
     uvrank_b=uvrankfinder(uv_b)
+    walkability_a=walkscore(city_a,city_a_dict)
+    walkability_b=walkscore(city_b,city_b_dict)
 
-    score_a=aqirank_a+uvrank_a
-    score_b=aqirank_b+uvrank_b
+
+    score_a=aqirank_a+uvrank_a+(walkability_a)*0.1
+    score_b=aqirank_b+uvrank_b+(walkability_b)*0.1
 
     comparison_result = {
         'city_a': {
             'name': city_a,
             'aqi': aqi_a,
             'uv': uv_a,
+            'Walkability':walkability_a,
             'score': score_a
         },
         'city_b': {
             'name': city_b,
             'aqi': aqi_b,
             'uv': uv_b,
+            'Walkability':walkability_b,
             'score': score_b
         }
         
@@ -105,5 +131,52 @@ def compare_cities():
 
     return render_template('results.html', comparison_result=comparison_result)
 
+
+@app.route('/single_city', methods=['POST'])
+def single():
+    city_a = request.form.get('A')
+    city_a_dict={}
+    #city_b = request.form.get('B')
+    #city_b_dict={}
+
+    aqi_a = aqi(city_a,city_a_dict)
+    #aqi_b= aqi(city_b,city_b_dict)
+
+    uv_a = uv(city_a,city_a_dict)
+   # uv_b = uv(city_b,city_b_dict)
+
+    aqirank_a=aqirankfinder(aqi_a)
+    #aqirank_b=aqirankfinder(aqi_b)
+    uvrank_a=uvrankfinder(uv_a)
+    #uvrank_b=uvrankfinder(uv_b)
+    walkability_a=walkscore(city_a,city_a_dict)
+    #walkability_b=walkscore(city_b,city_b_dict)
+
+
+    score_a=aqirank_a+uvrank_a+(walkability_a)*0.1
+    #score_b=aqirank_b+uvrank_b+(walkability_b)*0.1
+
+    comparison_result = {
+        'city_a': {
+            'name': city_a,
+            'aqi': aqi_a,
+            'uv': uv_a,
+            'Walkability':walkability_a,
+            'score': score_a
+        },
+        #'city_b': {
+           # 'name': city_b,
+            #'aqi': aqi_b,
+           # 'uv': uv_b,
+           # 'Walkability':walkability_b,
+           # 'score': score_b
+       # }
+        
+    }
+
+    #return render_template('results.html', comparison_result=comparison_result)
+    return render_template('singleresult.html',comparison_result=comparison_result)
+    
 if __name__ == '__main__':
     app.run(debug=True)
+
